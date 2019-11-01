@@ -80,6 +80,20 @@ RUN set -e; \
     && rm -rf "$GNUPGHOME" swift.tar.gz.sig swift.tar.gz \
     && apt-get purge --auto-remove -y curl
 
+#
+# Install Jazzy
+#
+RUN gem install jazzy
+
+#
+# Install SourceKitten
+#
+RUN git clone https://github.com/jpsim/SourceKitten.git && \
+    ( cd SourceKitten && swift build -c release && \
+    mkdir -p /usr/local/bin && \
+    cp -p .build/release/sourcekitten /usr/local/bin && \
+    cp -p .build/release/sourcekitten `echo /var/lib/gems/*/gems/jazzy-*/bin/ | tr ' ' '\n' | tail -n1` )
+
 ## Fix dirmngr
 #RUN sudo apt-get purge dirmngr -y && sudo apt-get install dirmngr -y
 
