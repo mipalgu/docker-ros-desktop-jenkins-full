@@ -22,7 +22,7 @@ RUN wget https://github.com/google/googletest/archive/release-1.7.0.zip && \
     make && \
     mkdir -p /usr/local && \
     cp -a ../include/gtest /usr/local/include && \
-    cp -a lib* /usr/local/lib/ &&
+    cp -a lib* /usr/local/lib/ && \
     cd ../.. && rm -rf gtest* )
 
 #
