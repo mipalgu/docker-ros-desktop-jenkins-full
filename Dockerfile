@@ -2,12 +2,12 @@
 FROM dorowu/ubuntu-desktop-lxde-vnc:bionic
 LABEL maintainer "info@mipal.net.au"
 
-RUN apt-get update && apt-get upgrade -y && apt-get install -y git curl wget
+RUN apt-get update && apt-get upgrade -y && apt-get install -y git curl wget dirmngr
 
 #
 # Swift Installation
 #
-RUN export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true && apt-get -q update && \
+RUN export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true && \
     apt-get -q install -y \
     libatomic1 \
     libcurl4 \
@@ -59,8 +59,8 @@ RUN set -e; \
     && rm -rf "$GNUPGHOME" swift.tar.gz.sig swift.tar.gz \
     && apt-get purge --auto-remove -y curl
 
-# Fix dirmngr
-RUN sudo apt-get purge dirmngr -y && sudo apt-get install dirmngr -y
+## Fix dirmngr
+#RUN sudo apt-get purge dirmngr -y && sudo apt-get install dirmngr -y
 
 # Add the official Java repository
 RUN sudo add-apt-repository -y ppa:webupd8team/java
