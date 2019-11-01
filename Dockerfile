@@ -3,8 +3,61 @@ FROM dorowu/ubuntu-desktop-lxde-vnc:bionic
 LABEL maintainer "info@mipal.net.au"
 
 RUN apt-get update && apt-get upgrade -y && apt-get install -y git curl wget
-#RUN apt-get update && apt-get install -y git curl wget
-# && rm -rf /var/lib/apt/lists/*
+
+#
+# Swift Installation
+#
+RUN export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true && apt-get -q update && \
+    apt-get -q install -y \
+    libatomic1 \
+    libcurl4 \
+    libxml2 \
+    libedit2 \
+    libsqlite3-0 \
+    libc6-dev \
+    binutils \
+    libgcc-5-dev \
+    libstdc++-5-dev \
+    libpython2.7 \
+    tzdata \
+    git \
+    pkg-config \
+    && rm -r /var/lib/apt/lists/*
+
+# Everything up to here should cache nicely between Swift versions, assuming dev dependencies change little
+
+# pub   4096R/ED3D1561 2019-03-22 [expires: 2021-03-21]
+#       Key fingerprint = A62A E125 BBBF BB96 A6E0  42EC 925C C1CC ED3D 1561
+# uid                  Swift 5.x Release Signing Key <swift-infrastructure@swift.org
+ARG SWIFT_SIGNING_KEY=A62AE125BBBFBB96A6E042EC925CC1CCED3D1561
+ARG SWIFT_PLATFORM=ubuntu18.04
+ARG SWIFT_BRANCH=swift-5.1.1-release
+ARG SWIFT_VERSION=swift-5.1.1-RELEASE
+ARG SWIFT_WEBROOT=https://swift.org/builds/
+
+ENV SWIFT_SIGNING_KEY=$SWIFT_SIGNING_KEY \
+    SWIFT_PLATFORM=$SWIFT_PLATFORM \
+    SWIFT_BRANCH=$SWIFT_BRANCH \
+    SWIFT_VERSION=$SWIFT_VERSION \
+    SWIFT_WEBROOT=$SWIFT_WEBROOT
+
+RUN set -e; \
+    SWIFT_WEBDIR="$SWIFT_WEBROOT/$SWIFT_BRANCH/$(echo $SWIFT_PLATFORM | tr -d .)/" \
+    && SWIFT_BIN_URL="$SWIFT_WEBDIR/$SWIFT_VERSION/$SWIFT_VERSION-$SWIFT_PLATFORM.tar.gz" \
+    && SWIFT_SIG_URL="$SWIFT_BIN_URL.sig" \
+    # - Grab curl here so we cache better up above
+    && export DEBIAN_FRONTEND=noninteractive \
+    && apt-get -q update && apt-get -q install -y curl && rm -rf /var/lib/apt/lists/* \
+    # - Download the GPG keys, Swift toolchain, and toolchain signature, and verify.
+    && export GNUPGHOME="$(mktemp -d)" \
+    && curl -fsSL "$SWIFT_BIN_URL" -o swift.tar.gz "$SWIFT_SIG_URL" -o swift.tar.gz.sig \
+    && gpg --batch --quiet --keyserver ha.pool.sks-keyservers.net --recv-keys "$SWIFT_SIGNING_KEY" \
+    && gpg --batch --verify swift.tar.gz.sig swift.tar.gz \
+    # - Unpack the toolchain, set libs permissions, and clean up.
+    && tar -xzf swift.tar.gz --directory / --strip-components=1 \
+    && chmod -R o+r /usr/lib/swift \
+    && rm -rf "$GNUPGHOME" swift.tar.gz.sig swift.tar.gz \
+    && apt-get purge --auto-remove -y curl
 
 # Fix dirmngr
 RUN sudo apt-get purge dirmngr -y && sudo apt-get install dirmngr -y
@@ -12,89 +65,6 @@ RUN sudo apt-get purge dirmngr -y && sudo apt-get install dirmngr -y
 # Add the official Java repository
 RUN sudo add-apt-repository -y ppa:webupd8team/java
 RUN sudo apt-get install -y openjdk-8-jre-headless
-
-# Add Jenkins
-ARG user=jenkins
-ARG group=jenkins
-ARG uid=1111
-ARG gid=1111
-ARG http_port=8082
-ARG agent_port=50000
-ARG JENKINS_HOME=/var/jenkins_home
-ARG REF=/usr/share/jenkins/ref
-
-ENV JENKINS_HOME $JENKINS_HOME
-ENV JENKINS_SLAVE_AGENT_PORT ${agent_port}
-ENV REF $REF
-
-# Jenkins is run with user `jenkins`, uid = 1111
-# If you bind mount a volume from the host or a data container,
-# ensure you use the same uid
-RUN mkdir -p $JENKINS_HOME \
-  && chown ${uid}:${gid} $JENKINS_HOME \
-  && groupadd -g ${gid} ${group} \
-  && useradd -d "$JENKINS_HOME" -u ${uid} -g ${gid} -m -s /bin/bash ${user}
-
-# Jenkins home directory is a volume, so configuration and build history
-# can be persisted and survive image upgrades
-VOLUME $JENKINS_HOME
-
-# $REF (defaults to `/usr/share/jenkins/ref/`) contains all reference configuration we want
-# to set on a fresh new installation. Use it to bundle additional plugins
-# or config file with your custom jenkins Docker image.
-RUN mkdir -p ${REF}/init.groovy.d
-
-# Use tini as subreaper in Docker container to adopt zombie processes
-ARG TINI_VERSION=v0.16.1
-COPY tini_pub.gpg ${JENKINS_HOME}/tini_pub.gpg
-RUN sudo curl -fsSL https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-static-$(dpkg --print-architecture) -o /sbin/tini \
-  && sudo curl -fsSL https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-static-$(dpkg --print-architecture).asc -o /sbin/tini.asc \
-  && sudo env HOME=/root gpg --no-tty --import ${JENKINS_HOME}/tini_pub.gpg \
-  && sudo env HOME=/root gpg --verify /sbin/tini.asc \
-  && sudo rm -rf /sbin/tini.asc /root/.gnupg \
-  && sudo chmod +x /sbin/tini
-
-# jenkins version being bundled in this docker image
-ARG JENKINS_VERSION
-ENV JENKINS_VERSION ${JENKINS_VERSION:-2.176.2}
-
-# jenkins.war checksum, download will be validated using it
-ARG JENKINS_SHA=33a6c3161cf8de9c8729fd83914d781319fd1569acf487c7b1121681dba190a5
-
-# Can be used to customize where jenkins.war get downloaded from
-ARG JENKINS_URL=https://repo.jenkins-ci.org/public/org/jenkins-ci/main/jenkins-war/${JENKINS_VERSION}/jenkins-war-${JENKINS_VERSION}.war
-
-# could use ADD but this one does not check Last-Modified header neither does it allow to control checksum
-# see https://github.com/docker/docker/issues/8331
-RUN curl -fsSL ${JENKINS_URL} -o /usr/share/jenkins/jenkins.war \
-  && echo "${JENKINS_SHA}  /usr/share/jenkins/jenkins.war" | sha256sum -c -
-
-ENV JENKINS_UC https://updates.jenkins.io
-ENV JENKINS_UC_EXPERIMENTAL=https://updates.jenkins.io/experimental
-ENV JENKINS_INCREMENTALS_REPO_MIRROR=https://repo.jenkins-ci.org/incrementals
-RUN chown -R ${user} "$JENKINS_HOME" "$REF"
-
-# for main web interface:
-EXPOSE ${http_port}
-
-# will be used by attached slave agents:
-EXPOSE ${agent_port}
-
-ENV COPY_REFERENCE_FILE_LOG $JENKINS_HOME/copy_reference_file.log
-
-# Finalise Jenkins
-USER ${user}
-
-COPY jenkins-support /usr/local/bin/jenkins-support
-COPY jenkins.sh /usr/local/bin/jenkins.sh
-#COPY tini-shim.sh /bin/tini
-#ENTRYPOINT ["/sbin/tini", "--", "/usr/local/bin/jenkins.sh"]
-
-# from a derived Dockerfile, can use `RUN plugins.sh active.txt` to setup ${REF}/plugins from a support bundle
-COPY plugins.sh /usr/local/bin/plugins.sh
-COPY install-plugins.sh /usr/local/bin/install-plugins.sh
-
-USER root
 
 # Adding keys for ROS
 RUN sh -c 'echo "deb http://packages.ros.org/ros/ubuntu $(lsb_release -sc) main" > /etc/apt/sources.list.d/ros-latest.list'
@@ -126,3 +96,6 @@ RUN sudo apt install -y python-rosinstall python-rosinstall-generator python-wst
 RUN /bin/bash -c "source /opt/ros/melodic/setup.bash && \
                   cd ~/ros_ws/ && rm -rf build devel && \
                   catkin_make"
+
+# Print Installed Swift Version
+RUN swift --version
