@@ -22,6 +22,7 @@ RUN mkdir -p $JENKINS_HOME \
   && chown ${uid}:${gid} $JENKINS_HOME \
   && groupadd -g ${gid} ${group} \
   && useradd -d "$JENKINS_HOME" -u ${uid} -g ${gid} -m -s /bin/bash ${user} \
+  && touch $JENKINS_HOME/.bashrc \
   &&  /bin/bash -c "echo 'export HOME='$JENKINS_HOME >> $JENKINS_HOME/.bashrc && source $JENKINS_HOME/.bashrc"
 
 # Jenkins home directory is a volume, so configuration and build history
