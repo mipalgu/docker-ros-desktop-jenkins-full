@@ -9,6 +9,6 @@ cat  Dockerfile > Dockerfile.jenkins
 echo "Adding the tail from JenkinsPart.jenkins"
 cat  JenkinsPart.jenkins >> Dockerfile.jenkins
 echo "To build the container: docker build . -f Dockerfile.jenkins -t mipal-swift-jenkins:latest"
-echo "To start (run the container) the image: docker run -it --rm -p 6080:80 -p 8082:8080 -v <absolute-path-to-host-directory>:/var/jenkins_home mipal-swift-jenkins"
+echo "To start (run the container) the image: docker run -it --rm -p 6080:80 -p 8082:8080 --dns=132.234.51.220 -v <absolute-path-to-host-directory>:/var/jenkins_home mipal-swift-jenkins"
 echo "To get a shell in the container as the jenkins user:  docker exec -it --user jenkins \`docker ps -l -q\`   bash"
 echo "To access the WEB interface for jenkins go to http://localhost:8082"
