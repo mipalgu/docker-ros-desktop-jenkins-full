@@ -95,15 +95,15 @@ RUN git clone https://github.com/jpsim/SourceKitten.git && \
     cp -p .build/release/sourcekitten `echo /var/lib/gems/*/gems/jazzy-*/bin/ | tr ' ' '\n' | tail -n1` )
 
 # Add the official Java repository
-RUN sudo add-apt-repository -y ppa:webupd8team/java
-RUN sudo apt-get install -y openjdk-8-jre-headless
+RUN add-apt-repository -y ppa:webupd8team/java
+RUN apt-get install -y openjdk-8-jre-headless
 
 # Adding keys for ROS
 RUN sh -c 'echo "deb http://packages.ros.org/ros/ubuntu $(lsb_release -sc) main" > /etc/apt/sources.list.d/ros-latest.list'
-RUN sudo apt-key adv --keyserver 'hkp://keyserver.ubuntu.com:80' --recv-key C1CF6E31E6BADE8868B172B4F42ED6FBAB17C654
+RUN apt-key adv --keyserver 'hkp://keyserver.ubuntu.com:80' --recv-key C1CF6E31E6BADE8868B172B4F42ED6FBAB17C654
 
 # Installing ROS
-RUN sudo apt-get update && sudo apt-get install -y ros-melodic-desktop-full \
+RUN apt-get update && apt-get install -y ros-melodic-desktop-full \
 		wget git nano
 RUN rosdep init && rosdep update
 
@@ -119,7 +119,7 @@ RUN /bin/bash -c "source /opt/ros/melodic/setup.bash && \
                   echo 'source ~/ros_ws/devel/setup.bash' >> ~/.bashrc && \
                   echo 'source ~/ros_ws/devel/setup.bash' >> /root/.bashrc "
 
-RUN sudo apt install -y python-rosinstall python-rosinstall-generator python-wstool build-essential
+RUN apt-get install -y python-rosinstall python-rosinstall-generator python-wstool build-essential
 
 # Updating ROSDEP and installing dependencies
 ##RUN cd ~/ros_ws && rosdep update && rosdep install --from-paths src --ignore-src --rosdistro=kinetic -y
